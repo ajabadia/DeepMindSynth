@@ -12,7 +12,7 @@ DeepMindSynthAudioProcessorEditor::DeepMindSynthAudioProcessorEditor (DeepMindSy
       midiKeyboard (p.keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard)
 {
     juce::LookAndFeel::setDefaultLookAndFeel(&lnf);
-    setSize (1024, 768);
+    setSize (1200, 800);
     
     // --- Helper to setup sliders ---
     auto setupSlider = [this](juce::Slider& slider, juce::String paramId, std::unique_ptr<Attachment>& attachment)
@@ -64,8 +64,8 @@ DeepMindSynthAudioProcessorEditor::DeepMindSynthAudioProcessorEditor (DeepMindSy
 
     // --- KEYBOARD ---
     addAndMakeVisible(midiKeyboard);
-    midiKeyboard.setAvailableRange(24, 96);
-
+    midiKeyboard.setAvailableRange(36, 96); // 61 Keys (C2 to C7) for fuller look
+    
     // --- BUTTONS ---
     addAndMakeVisible(btnArp);
     addAndMakeVisible(btnMod);
@@ -240,10 +240,81 @@ void DeepMindSynthAudioProcessorEditor::paint (juce::Graphics& g)
 
     // Draw Labels for Sliders (Hardware style printed on chassis)
     g.setColour(juce::Colours::white);
-    g.setFont(10.0f);
     
-    // Helper to draw label above slider rect (approximated based on known layout)
-    // In a real app, we'd store the rects. For now, we rely on the grid logic matching resized().
+    // --- REPLICATE LAYOUT LOGIC FOR LABELS ---
+    const int margin = 5;
+    const int headerH = 25; 
+    const int stripH = 5;
+    
+    auto getSectionBody = [&](juce::Rectangle<int> sectionRect) {
+        return sectionRect.reduced(margin).withTrimmedTop(headerH).withTrimmedBottom(stripH);
+    };
+
+    // --- OSC SECTION ---
+    {
+        auto r = getSectionBody(oscArea);
+        int w = r.getWidth() / 8;
+        drawControlLabel(g, r.removeFromLeft(w), "RANGE");
+        drawControlLabel(g, r.removeFromLeft(w), "PWM");
+        drawControlLabel(g, r.removeFromLeft(w), "PITCH");
+        drawControlLabel(g, r.removeFromLeft(w), "TONE");
+        drawControlLabel(g, r.removeFromLeft(w), "LEVEL");
+        drawControlLabel(g, r.removeFromLeft(w), "SAW");
+        drawControlLabel(g, r.removeFromLeft(w), "PULSE");
+        drawControlLabel(g, r.removeFromLeft(w), "NOISE");
+    }
+    
+    // --- VCF SECTION ---
+    {
+        auto r = getSectionBody(vcfArea);
+        r.removeFromBottom(20); // Skip Combo
+        int w = r.getWidth() / 5;
+        drawControlLabel(g, r.removeFromLeft(w), "FREQ");
+        drawControlLabel(g, r.removeFromLeft(w), "RES");
+        drawControlLabel(g, r.removeFromLeft(w), "ENV");
+        drawControlLabel(g, r.removeFromLeft(w), "LFO");
+        drawControlLabel(g, r.removeFromLeft(w), "KYBD");
+    }
+    
+    // --- HPF ---
+    {
+        auto r = getSectionBody(hpfArea);
+        drawControlLabel(g, r, "FREQ");
+    }
+    
+    // --- ENVELOPES ---
+    {
+        auto r = getSectionBody(envArea);
+        int w = r.getWidth() / 4;
+        drawControlLabel(g, r.removeFromLeft(w), "A");
+        drawControlLabel(g, r.removeFromLeft(w), "D");
+        drawControlLabel(g, r.removeFromLeft(w), "S");
+        drawControlLabel(g, r.removeFromLeft(w), "R");
+    }
+    
+    // --- LFOs ---
+    {
+        auto r = getSectionBody(lfoArea);
+        auto lfo1 = r.removeFromLeft(r.getWidth()/2);
+        auto lfo2 = r;
+        
+        // Draw centered header for LFO1/2? No, individual params
+        int w1 = lfo1.getWidth() / 2;
+        drawControlLabel(g, lfo1.removeFromLeft(w1), "RATE 1");
+        drawControlLabel(g, lfo1, "DELAY 1");
+        
+        int w2 = lfo2.getWidth() / 2;
+        drawControlLabel(g, lfo2.removeFromLeft(w2), "RATE 2");
+        drawControlLabel(g, lfo2, "DELAY 2");
+    }
+}
+
+void DeepMindSynthAudioProcessorEditor::drawControlLabel(juce::Graphics& g, juce::Rectangle<int> bounds, juce::String name)
+{
+    g.setFont(10.0f);
+    // Draw at top of the slider area (slider usually has some margin, keep it tight)
+    auto labelArea = bounds.removeFromTop(12); 
+    g.drawFittedText(name, labelArea, juce::Justification::centred, 1);
 }
 
 void DeepMindSynthAudioProcessorEditor::drawSection(juce::Graphics& g, juce::Rectangle<int> bounds, juce::String title, juce::Colour headerColor)
@@ -270,12 +341,16 @@ void DeepMindSynthAudioProcessorEditor::drawSection(juce::Graphics& g, juce::Rec
 }
 
 
+// Increased Keyboard Height
 void DeepMindSynthAudioProcessorEditor::resized()
 {
     auto area = getLocalBounds();
     
     // 1. Keyboard (Full Width, Bottom)
-    midiKeyboard.setBounds(area.removeFromBottom(80));
+    auto kbArea = area.removeFromBottom(140); // Taller keyboard
+    midiKeyboard.setBounds(kbArea);
+    // Auto-width: Range 36-96 is 61 keys -> 36 white keys
+    midiKeyboard.setKeyWidth(kbArea.getWidth() / 36.0f);
     
     // Layout Constants
     const int margin = 5;

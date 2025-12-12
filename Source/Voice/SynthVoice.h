@@ -18,6 +18,7 @@ namespace voice
         SynthVoice();
         
         bool canPlaySound(juce::SynthesiserSound*) override;
+        void setCurrentPlaybackSampleRate (double newRate) override;
         void startNote(int midiNoteNumber, float velocity, juce::SynthesiserSound*, int currentPitchWheelPosition) override;
         void stopNote(float velocity, bool allowTailOff) override;
         void pitchWheelMoved(int newPitchWheelValue) override;
@@ -38,6 +39,19 @@ namespace voice
         juce::ADSR envVcf;
         juce::ADSR envMod;
         
+        // LFOs
+        juce::dsp::Oscillator<float> lfo1;
+        juce::dsp::Oscillator<float> lfo2;
+        float lfo1Value = 0.0f;
+        float lfo2Value = 0.0f;
+        
+        // LFO Params
+        float lfo1Rate = 1.0f;
+        float lfo1Delay = 0.0f;
+        float lfo2Rate = 1.0f;
+        float lfo2Delay = 0.0f;
+        
         float currentVelocity = 0.0f;
+        double currentBaseFrequency = 440.0;
     };
 }

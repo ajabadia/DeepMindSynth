@@ -54,6 +54,7 @@ private:
     
     // Layout Helpers
     void drawSection(juce::Graphics& g, juce::Rectangle<int> bounds, juce::String title, juce::Colour headerColor);
+    void drawControlLabel(juce::Graphics& g, juce::Rectangle<int> bounds, juce::String name);
     
     std::unique_ptr<Attachment> att_vca_a, att_vca_d, att_vca_s, att_vca_r;
     
