@@ -85,12 +85,7 @@ void DeepMindOsc::processBlock(juce::dsp::AudioBlock<float>& block)
             // Mix
             float mixed = (saw * sawLevel) + (pulse * pulseLevel);
             
-            samples[i] += mixed; // Add to existing (polyphony sum) or overwrite? 
-                                 // Usually overwrite if this is a voice, but SynthVoice adds to main buffer.
-                                 // Here we are inside one Osc, so we should probably overwrite 'samples[i]' 
-                                 // if this is the start of the chain, OR add if we reuse the buffer.
-                                 // Let's assume overwrite for the Osc output.
-            samples[i] = mixed;
+            samples[i] += mixed; // Add to existing (polyphony sum)
         }
     }
 }

@@ -39,17 +39,19 @@ namespace voice
         juce::ADSR envVcf;
         juce::ADSR envMod;
         
-        // LFOs
-        juce::dsp::Oscillator<float> lfo1;
-        juce::dsp::Oscillator<float> lfo2;
-        float lfo1Value = 0.0f;
-        float lfo2Value = 0.0f;
+        // LFOs (Manual Phase Accumulators)
+        double lfo1Phase = 0.0;
+        double lfo2Phase = 0.0;
+        double currentSampleRate = 44100.0;
+        
+        float lfoOsc1Value = 0.0f;
+        float lfoOsc2Value = 0.0f;
         
         // LFO Params
-        float lfo1Rate = 1.0f;
-        float lfo1Delay = 0.0f;
-        float lfo2Rate = 1.0f;
-        float lfo2Delay = 0.0f;
+        float currentLfoOsc1Rate = 1.0f;
+        float lfoOsc1Delay = 0.0f;
+        float currentLfoOsc2Rate = 1.0f;
+        float lfoOsc2Delay = 0.0f;
         
         float currentVelocity = 0.0f;
         double currentBaseFrequency = 440.0;
