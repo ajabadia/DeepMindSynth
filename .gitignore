@@ -1,0 +1,33 @@
+
+# DeepMindSynth Gitignore
+
+# Build directories
+out/
+build/
+cmake-build-*/
+x64/
+Release/
+Debug/
+
+# Visual Studio / IDE
+.vs/
+.vscode/
+*.user
+*.opendb
+*.db
+*.ipch
+
+# JUCE
+JuceLibraryCode/
+!JuceLibraryCode/AppConfig.h
+
+# Temporary Log Files
+build_*.txt
+*.log
+
+# System
+.DS_Store
+Thumbs.db
+
+# Presets (Ignore user created, or keep? Usually ignore user specific, but we might want to track default. Let's ignore for now if they are locally generated)
+# Documents/DeepMindSynth/Presets
