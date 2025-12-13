@@ -1,10 +1,14 @@
 #pragma once
 #include <JuceHeader.h>
+#include <atomic>
 #include "Voice/SynthVoice.h"
 #include "DSP/Effects/FxChain.h"
 #include "DSP/Arpeggiator/Arpeggiator.h"
+#include "Data/MidiManager.h"
+#include "Data/OscManager.h"
+#include "Data/ChordMemory.h"
 
-class DeepMindSynthAudioProcessor  : public juce::AudioProcessor
+class DeepMindSynthAudioProcessor  : public juce::AudioProcessor, public juce::AudioProcessorValueTreeState::Listener
 {
 public:
     DeepMindSynthAudioProcessor();
@@ -36,14 +40,26 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
     
+    // Listener
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
+    void updatePolyphony();
+    
     // Public for Editor access
+    data::ChordMemory chordMemory;
+    std::unique_ptr<data::OscManager> oscManager;
+    float getCpuUsage() const { return 0.0f; } // Placeholder
+    std::atomic<int> lastNoteTriggered { -1 };
+
     juce::AudioProcessorValueTreeState apvts;
     juce::MidiKeyboardState keyboardState;
+    std::unique_ptr<data::MidiManager> midiManager;
 
 private:
     juce::Synthesiser synthesiser;
     DeepMindDSP::FxChain fxChain;
-    DeepMindDSP::Arpeggiator arpeggiator; // New instance
+    DeepMindDSP::Arpeggiator arpeggiator; 
+    // data::ChordMemory chordMemory; // Moved to public
+    // std::unique_ptr<data::MidiManager> midiManager; // Moved to public
     
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 

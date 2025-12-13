@@ -3,14 +3,8 @@ cmake_minimum_required(VERSION 3.22)
 project(DeepMindSynth VERSION 0.0.1)
 
 # --- JUCE Setup ---
-# Fetch JUCE from the master branch
-include(FetchContent)
-FetchContent_Declare(
-    juce
-    GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
-    GIT_TAG        master
-)
-FetchContent_MakeAvailable(juce)
+# --- JUCE Setup (Local) ---
+add_subdirectory("C:/JUCE" "${CMAKE_CURRENT_BINARY_DIR}/JUCE")
 
 # --- Standard JUCE Options ---
 # Enable VST3 and generic plugin client
@@ -62,7 +56,7 @@ endif()
 
 # --- Source Files ---
 # Recursively add all source files to the target
-# Force re-glob: Added PresetManager
+# Force re-glob: Added PresetManager, Midi, Osc, and FX Modules - Re-scan required
 file(GLOB_RECURSE SourceFiles "Source/*.cpp" "Source/*.h" "Source/*.c" "Source/*.mm")
 
 target_sources(DeepMindSynth PRIVATE
@@ -93,6 +87,7 @@ target_link_libraries(DeepMindSynth PRIVATE
     juce::juce_events
     juce::juce_graphics
     juce::juce_core
+    juce::juce_osc
 )
 
 # --- Definitions ---

@@ -17,6 +17,7 @@ namespace DeepMindDSP
 
         // Parameters sets frequency
         void setFrequency(float frequency);
+        float getFrequency() const { return currentFrequency; }
 
         // Parameters
         void setType(int type);
@@ -33,6 +34,7 @@ namespace DeepMindDSP
         float pulseLevel = 0.5f;
         float pwmDepth = 0.0f;
         float currentPwm = 0.5f; // Target width (0.0 - 1.0)
+        float currentFrequency = 440.0f;
         
         float sampleRate = 44100.0f;
     };

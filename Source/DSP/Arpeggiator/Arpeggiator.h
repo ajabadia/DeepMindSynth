@@ -22,6 +22,16 @@ namespace DeepMindDSP
         void prepare(const juce::dsp::ProcessSpec& spec);
         void reset();
 
+        struct PatternStep
+        {
+            int noteIndex = 0; // 0=Lowest Held, 1=Second, etc.
+            int octave = 0;    // 0=Base, 1=+1 Oct, etc.
+            int velocity = 127; // 0=Rest?
+            float gate = 0.5f; // Step duration multiplier
+        };
+
+        void setPattern(int patternIndex);
+
         // Process incoming MIDI and generate arpeggiated MIDI
         void processBlock(juce::MidiBuffer& midiMessages, int numSamples);
         
@@ -51,5 +61,9 @@ namespace DeepMindDSP
         
         void handleMidiEvent(const juce::MidiMessage& m);
         int getNextNote();
+        
+        // Pattern Data
+        std::vector<std::vector<PatternStep>> patterns;
+        int currentPatternIndex = 0;
     };
 }

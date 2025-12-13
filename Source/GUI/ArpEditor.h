@@ -36,9 +36,16 @@ public:
         // OCTAVES
         addAndMakeVisible(sldOct);
         sldOct.setSliderStyle(juce::Slider::LinearBar);
-        attOct = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "arp_oct", sldOct);
+        // PATTERN
+        addAndMakeVisible(cmbPattern);
+        cmbPattern.addItem("Up 4", 1);
+        cmbPattern.addItem("UpDown 8", 2);
+        cmbPattern.addItem("Oct Jump", 3);
+        cmbPattern.addItem("Randomish", 4);
+        cmbPattern.addItem("Rhythmic", 5);
+        attPattern = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvts, "arp_pattern", cmbPattern);
 
-        setSize(400, 300);
+        setSize(500, 300); // Slightly wider
     }
 
     void paint(juce::Graphics& g) override
@@ -55,6 +62,7 @@ public:
         g.drawText("Rate", sldRate.getX(), sldRate.getY() - 20, sldRate.getWidth(), 20, juce::Justification::centred);
         g.drawText("Gate", sldGate.getX(), sldGate.getY() - 20, sldGate.getWidth(), 20, juce::Justification::centred);
         g.drawText("Octaves", sldOct.getX(), sldOct.getY() - 20, sldOct.getWidth(), 20, juce::Justification::centred);
+        g.drawText("Pattern", cmbPattern.getX(), cmbPattern.getY() - 20, cmbPattern.getWidth(), 20, juce::Justification::centred);
     }
 
     void resized() override
@@ -72,6 +80,7 @@ public:
         sldRate.setBounds(controls.removeFromLeft(80).reduced(5));
         sldGate.setBounds(controls.removeFromLeft(80).reduced(5));
         sldOct.setBounds(controls.removeFromLeft(80).reduced(5, 30));
+        cmbPattern.setBounds(controls.removeFromLeft(100).reduced(5, 30)); // Added
     }
 
 private:
@@ -82,4 +91,7 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> attOn;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> attMode;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attRate, attGate, attOct;
+    
+    juce::ComboBox cmbPattern;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> attPattern;
 };

@@ -100,15 +100,14 @@ void MultiFilter::setResonance(float resonance)
     float calibratedRes = resonance * resonance; // Simple taper
     
     // For Ladder (Jupiter/Acid)
-    // Avoid exactly 1.0 to prevent blowing up in floating point if unstable, cap at 0.99 for safety unless we want pure sine.
-    ladderFilter.setResonance(juce::jmap(calibratedRes, 0.0f, 0.99f));
+    // IR3109 Emulation: Allow Self-Oscillation at Max.
+    // JUCE Ladder self-oscillates at 1.0. 
+    ladderFilter.setResonance(juce::jmap(calibratedRes, 0.0f, 1.0f));
     
     // For SVF (MS-20)
-    // SVF Q factor: 1/sqrt(2) is flat (~0.707).
-    // High Q can go up to 10 or 20.
-    // resonance input is 0-1.
-    // Map 0 -> 0.707, 1 -> 10.0
-    svFilter.setResonance(juce::jmap(calibratedRes, 0.707f, 10.0f));
+    // MS-20 screams. High Q required.
+    // Map 0 -> 0.707, 1 -> 24.0 (Aggressive)
+    svFilter.setResonance(juce::jmap(calibratedRes, 0.707f, 24.0f));
 }
 
 void MultiFilter::setDrive(float drive)

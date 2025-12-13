@@ -1,14 +1,17 @@
 #pragma once
 #include <JuceHeader.h>
+#include <vector>
 
 namespace data
 {
     class SysexTranslator
     {
     public:
-        static bool parseSysex(const juce::MidiMessage& message, juce::AudioProcessorValueTreeState& apvts);
+        // Returns empty vector if invalid or not a program dump
+        static std::vector<int> parseSysex(const juce::MidiMessage& message);
     
     private:
-        static bool decodeDeepMindData(const juce::uint8* data, int size, juce::AudioProcessorValueTreeState& apvts);
+        static std::vector<int> decodePackedData(const juce::uint8* data, int size);
     };
 }
+

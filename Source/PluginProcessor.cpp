@@ -1,6 +1,8 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
-#include "Data/SysexTranslator.h" // Ensure this is included
+#include "Data/SysexTranslator.h" 
+#include "Data/MidiManager.h" // Explicit include to fix incomplete type
+#include "Data/DeepMindParameters.h"
 
 DeepMindSynthAudioProcessor::DeepMindSynthAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -14,20 +16,27 @@ DeepMindSynthAudioProcessor::DeepMindSynthAudioProcessor()
 #if JUCE_STANDALONE_APPLICATION
     // RPi Headless / Kiosk Mode Auto-Connect
     // Auto-select first available MIDI and Audio devices on startup
-    /*
-    auto& deviceManager = juce::StandalonePluginHolder::getInstance()->deviceManager;
     
-    // 1. Audio
-    // JUCE often auto-selects default audio, but we can force it if needed.
-    // For now, assume default is improved by recent JUCE versions.
+    // Defer slighty to ensure devices are ready? No, constructor is fine usually.
+    // We need to access the StandalonePluginHolder.
     
-    // 2. MIDI Input (Enable first if none enabled)
-    auto midiInputs = juce::MidiInput::getAvailableDevices();
-    if (midiInputs.size() > 0)
-    {
-        if (!deviceManager.isMidiInputDeviceEnabled(midiInputs[0].identifier))
-            deviceManager.setMidiInputDeviceEnabled(midiInputs[0].identifier, true);
-    }
+    // Note: This only compiles if we are building the Standalone target source specifically,
+    // or if JUCE_STANDALONE_APPLICATION is defined (which it is for standalone builds).
+    
+    /* 
+       We cannot easily access StandalonePluginHolder instance from here without linking headers 
+       or using magic singletons that might not be init yet.
+       However, we can just use MidiInput::getAvailableDevices() and set it on the *DeviceManager*?
+       Wait, the DeviceManager belongs to the StandaloneFilterWindow... 
+       Actually, standard JUCE AudioProcessor doesn't own the DeviceManager.
+       The Standalone wrapper does.
+       
+       Hack: The user can select it in Options.
+       But for a "It sounded before" fix, maybe we should just ensure logic is correct.
+       The user said "Test works". That suggests Audio driver is fine.
+       If Screen Keyboard doesn't work, MIDI INPUT device is NOT the issue for *Screen Keyboard*.
+       
+       So the issue is likely internal (Arp or processing).
     */
 #endif
 
@@ -36,10 +45,23 @@ DeepMindSynthAudioProcessor::DeepMindSynthAudioProcessor()
 
 
     // Add voices to synthesiser
-    for (int i = 0; i < 8; ++i)
+    // Add voices to synthesiser (Default to 12)
+    for (int i = 0; i < 12; ++i)
         synthesiser.addVoice(new voice::SynthVoice());
         
     synthesiser.addSound(new voice::SynthSound());
+    
+    synthesiser.addSound(new voice::SynthSound());
+    
+    
+    midiManager = std::make_unique<data::MidiManager>(apvts);
+    oscManager = std::make_unique<data::OscManager>(apvts);
+    oscManager->connect(8000); // Port 8000
+    
+    apvts.addParameterListener("polyphony_mode", this);
+    // Initial update
+    // updatePolyphony(); // Calling virtual/complex methods in constructor is risky? 
+    // Just ensure default 12 voices (set in loop above to 8. Update to 12).
 }
 
 DeepMindSynthAudioProcessor::~DeepMindSynthAudioProcessor()
@@ -48,102 +70,7 @@ DeepMindSynthAudioProcessor::~DeepMindSynthAudioProcessor()
 
 juce::AudioProcessorValueTreeState::ParameterLayout DeepMindSynthAudioProcessor::createParameterLayout()
 {
-    juce::AudioProcessorValueTreeState::ParameterLayout layout;
-    
-    auto addFloat = [&](juce::String id, juce::String name, float min, float max, float def) {
-        layout.add(std::make_unique<juce::AudioParameterFloat>(id, name, min, max, def));
-    };
-
-    auto addChoice = [&](juce::String id, juce::String name, juce::StringArray choices, int defIndex) {
-        layout.add(std::make_unique<juce::AudioParameterChoice>(id, name, choices, defIndex));
-    };
-
-    // --- OSCILLATORS ---
-    addFloat("dco1_range", "DCO1 Range", 0.0f, 4.0f, 2.0f); // 16', 8', 4' etc (Discrete steps effectively)
-    addFloat("dco1_pwm", "DCO1 PWM", 0.0f, 1.0f, 0.5f);
-    addFloat("dco2_pitch", "DCO2 Pitch", -12.0f, 12.0f, 0.0f);
-    addFloat("dco2_tone", "DCO2 Tone Mod", 0.0f, 1.0f, 0.0f);
-    addFloat("dco2_lvl", "DCO2 Level", 0.0f, 1.0f, 1.0f); // Mix
-    addFloat("saw_lvl", "Saw Level", 0.0f, 1.0f, 1.0f);   // DCO1 Mix
-    addFloat("pulse_lvl", "Pulse Level", 0.0f, 1.0f, 0.0f); // DCO1 Mix
-    addFloat("noise_lvl", "Noise Level", 0.0f, 1.0f, 0.0f);
-
-    // --- FILTER ---
-    addFloat("vcf_freq", "VCF Freq", 20.0f, 20000.0f, 20000.0f); // CC 29
-    addFloat("vcf_res", "VCF Res", 0.0f, 1.0f, 0.0f);            // CC 30
-    addFloat("vcf_env", "VCF Env Depth", -1.0f, 1.0f, 0.0f);
-    addFloat("vcf_lfo", "VCF LFO Depth", 0.0f, 1.0f, 0.0f);
-    addFloat("vcf_kybd", "VCF Kybd Track", 0.0f, 1.0f, 0.0f);
-    addChoice("vcf_type", "Filter Type", {"Jupiter 24dB", "MS-20 LP", "Acid 303"}, 0);
-    addFloat("hpf_freq", "HPF Freq", 20.0f, 2000.0f, 20.0f); // Bass cut
-
-    // --- ENVELOPES (ADSR) ---
-    // VCA
-    addFloat("vca_attack", "VCA Attack", 0.0f, 10.0f, 0.01f);
-    addFloat("vca_decay", "VCA Decay", 0.0f, 10.0f, 0.5f);
-    addFloat("vca_sustain", "VCA Sustain", 0.0f, 1.0f, 1.0f);
-    addFloat("vca_release", "VCA Release", 0.0f, 10.0f, 0.1f);
-    
-    // VCF
-    addFloat("vcf_attack", "VCF Attack", 0.0f, 10.0f, 0.01f);
-    addFloat("vcf_decay", "VCF Decay", 0.0f, 10.0f, 0.5f);
-    addFloat("vcf_sustain", "VCF Sustain", 0.0f, 1.0f, 1.0f);
-    addFloat("vcf_release", "VCF Release", 0.0f, 10.0f, 0.1f);
-    
-    // MOD
-    addFloat("mod_attack", "Mod Attack", 0.0f, 10.0f, 0.01f);
-    addFloat("mod_decay",  "Mod Decay", 0.0f, 10.0f, 0.5f);
-    addFloat("mod_sustain","Mod Sustain", 0.0f, 1.0f, 1.0f);
-    addFloat("mod_release","Mod Release", 0.0f, 10.0f, 0.1f);
-
-    // --- LFOs ---
-    addFloat("lfo1_rate", "LFO1 Rate", 0.01f, 50.0f, 1.0f); // CC 16
-    addFloat("lfo1_delay", "LFO1 Delay", 0.0f, 5.0f, 0.0f);
-    addFloat("lfo2_rate", "LFO2 Rate", 0.01f, 50.0f, 1.0f);
-    addFloat("lfo2_delay", "LFO2 Delay", 0.0f, 5.0f, 0.0f);
-
-    // --- EFFECTS ---
-    // Chorus
-    addFloat("fx_chorus_mix", "Chorus Mix", 0.0f, 1.0f, 0.0f);
-    addFloat("fx_chorus_rate", "Chorus Rate", 0.1f, 10.0f, 1.0f);
-    addFloat("fx_chorus_depth", "Chorus Depth", 0.0f, 1.0f, 0.5f);
-    
-    // Delay
-    addFloat("fx_delay_mix", "Delay Mix", 0.0f, 1.0f, 0.0f);
-    addFloat("fx_delay_time", "Delay Time", 0.0f, 1.0f, 0.5f); // 0-1 sec
-    addFloat("fx_delay_feedback", "Delay Feedback", 0.0f, 0.95f, 0.0f);
-    
-    // Reverb
-    addFloat("fx_reverb_mix", "Reverb Mix", 0.0f, 1.0f, 0.0f);
-    addFloat("fx_reverb_size", "Reverb Size", 0.0f, 1.0f, 0.5f);
-    addFloat("fx_reverb_damp", "Reverb Damp", 0.0f, 1.0f, 0.5f);
-
-    // --- MOD MATRIX (8 Slots) ---
-    juce::StringArray modSources = { "None", "LFO1", "LFO2", "EnvMod", "Velocity", "ModWheel", "KeyTrack" };
-    juce::StringArray modDests = { "None", "Osc1 Pitch", "Osc1 PWM", "Osc2 Pitch", "VCF Freq", "VCF Res" };
-
-    for (int i = 1; i <= 8; ++i)
-    {
-        juce::String prefix = "mod_slot_" + juce::String(i);
-        addChoice(prefix + "_src", "Mod Slot " + juce::String(i) + " Src", modSources, 0); // Default None
-        addChoice(prefix + "_dst", "Mod Slot " + juce::String(i) + " Dst", modDests, 0);   // Default None
-        addFloat(prefix + "_amt",  "Mod Slot " + juce::String(i) + " Amt", -1.0f, 1.0f, 0.0f);
-    }
-
-    // --- ARPEGGIATOR ---
-    addChoice("arp_mode", "Arp Mode", { "Up", "Down", "UpDown", "Random", "Chord", "Pattern" }, 0);
-    addFloat("arp_rate", "Arp Rate", 0.0f, 1.0f, 0.5f); // Clock Divider or Hz
-    addFloat("arp_gate", "Arp Gate", 0.0f, 1.0f, 0.5f);
-    addFloat("arp_oct",  "Arp Octaves", 1.0f, 4.0f, 1.0f);
-    addFloat("arp_on",   "Arp On", 0.0f, 1.0f, 0.0f);
-
-    // --- GLOBAL ---
-    addFloat("master_vol", "Master Volume", 0.0f, 1.0f, 0.8f);
-    addFloat("portamento", "Portamento", 0.0f, 1.0f, 0.0f);
-    addFloat("unison_detune", "Unison Detune", 0.0f, 1.0f, 0.0f); // CC 28
-    addFloat("pan", "Pan", -1.0f, 1.0f, 0.0f); // CC 10
-
-    return layout;
+    return DeepMindParams::createParameterLayout();
 }
 
 void DeepMindSynthAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
@@ -157,7 +84,8 @@ void DeepMindSynthAudioProcessor::prepareToPlay (double sampleRate, int samplesP
     
     fxChain.prepare(spec);
     arpeggiator.prepare(spec);
-    arpeggiator.setBypass(false); // Enable for testing Phase 3.5
+    arpeggiator.prepare(spec);
+    // arpeggiator.setBypass(false); // DISABLED: Let parameters control bypass (default Off)
 }
 
 void DeepMindSynthAudioProcessor::releaseResources()
@@ -174,8 +102,35 @@ void DeepMindSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer
 {
     juce::ScopedNoDenormals noDenormals;
     
-    // Process On-Screen Keyboard
-    keyboardState.processNextMidiBuffer(midiMessages, 0, buffer.getNumSamples(), true);
+    // 1. Handle MIDI Input (Note On/Off handled by synth, CCs by Manager)
+    // Debug: Track Last Note
+    for (const auto metadata : midiMessages)
+    {
+        if (metadata.getMessage().isNoteOn())
+            lastNoteTriggered = metadata.getMessage().getNoteNumber();
+    }
+
+    midiManager->processMidiBuffer(midiMessages);
+    
+    // 1.5 Chord Memory (Expand Notes)
+    chordMemory.process(midiMessages);
+    
+    keyboardState.processNextMidiBuffer (midiMessages, 0, buffer.getNumSamples(), true);
+
+    // --- Audio Input Handling (Multi-FX Mode) ---
+    auto* extGain = apvts.getRawParameterValue("ext_audio_gain");
+    float inputGain = extGain ? extGain->load() : 0.0f;
+    
+    if (inputGain > 0.001f)
+    {
+        // Apply Gain to Input
+        buffer.applyGain(inputGain);
+    }
+    else
+    {
+        // Standard Synth Mode: Clear garbage/input
+        buffer.clear();
+    }
 
     // Handle MIDI CCs matching DeepMind Spec
     for (const auto metadata : midiMessages)
@@ -219,6 +174,9 @@ void DeepMindSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer
     if (arpMode) arpeggiator.setMode(static_cast<DeepMindDSP::ArpMode>((int)*arpMode));
     if (arpRate) arpeggiator.setRate(4.0f + (*arpRate * 20.0f)); // Simple mapping 4Hz to 24Hz for verification
     if (arpOct) arpeggiator.setOctaveRange((int)*arpOct);
+    
+    auto* arpPat = apvts.getRawParameterValue("arp_pattern");
+    if (arpPat) arpeggiator.setPattern((int)*arpPat);
 
     // Process Arpeggiator (Generates new MIDI notes based on held chords)
     // It modifies 'midiMessages' in place (clears input, adds arp notes)
@@ -267,8 +225,14 @@ void DeepMindSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer
 
     synthesiser.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
     
+    // Ensure we don't silence the synth if input gain is 0 (which is handled above).
+    // Synth renders ADDITIVELY to buffer.
+    
     juce::dsp::AudioBlock<float> block(buffer);
     fxChain.process(block);
+    
+    // Send Outgoing MIDI (CC/NRPN from UI)
+    midiManager->processOutgoingMidi(midiMessages);
 }
 
 bool DeepMindSynthAudioProcessor::hasEditor() const
@@ -309,6 +273,50 @@ int DeepMindSynthAudioProcessor::getCurrentProgram() { return 0; }
 void DeepMindSynthAudioProcessor::setCurrentProgram (int index) {}
 const juce::String DeepMindSynthAudioProcessor::getProgramName (int index) { return {}; }
 void DeepMindSynthAudioProcessor::changeProgramName (int index, const juce::String& newName) {}
+
+// --- Listener ---
+void DeepMindSynthAudioProcessor::parameterChanged(const juce::String& parameterID, float newValue)
+{
+    if (parameterID == "polyphony_mode")
+    {
+        juce::MessageManager::callAsync([this]() { updatePolyphony(); });
+    }
+}
+
+void DeepMindSynthAudioProcessor::updatePolyphony()
+{
+    int idx = (int)*apvts.getRawParameterValue("polyphony_mode");
+    int target = 12;
+    
+    switch(idx) {
+        case 0: target=12; break; // Poly
+        case 1: target=6; break; // U2
+        case 2: target=4; break; // U3
+        case 3: target=3; break; // U4
+        case 4: target=2; break; // U6
+        case 5: target=1; break; // U12
+        case 6: target=1; break; // Mono
+        case 7: target=1; break; // Mono-2
+        case 8: target=1; break; // Mono-3
+        case 9: target=1; break; // Mono-4
+        case 10: target=1; break; // Mono-6
+        case 11: target=6; break; // Poly-6
+        case 12: target=8; break; // Poly-8
+        default: target=12; break;
+    }
+    
+    if (synthesiser.getNumVoices() == target) return;
+    
+    suspendProcessing(true);
+    synthesiser.clearVoices();
+    for(int i=0; i<target; ++i)
+        synthesiser.addVoice(new voice::SynthVoice());
+        
+    if (getSampleRate() > 0)
+        synthesiser.setCurrentPlaybackSampleRate(getSampleRate());
+        
+    suspendProcessing(false);
+}
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {

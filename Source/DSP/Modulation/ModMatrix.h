@@ -10,7 +10,10 @@ namespace DeepMindDSP
         float envMod = 0.0f;
         float velocity = 0.0f;
         float modWheel = 0.0f;
-        float keyTrack = 0.0f; // Added
+        float keyTrack = 0.0f; 
+        float envVcf = 0.0f; // Added
+        float envVca = 0.0f; // Added
+        float ctrlSeq = 0.0f; // Control Sequencer
     };
 
     struct ModDestinations

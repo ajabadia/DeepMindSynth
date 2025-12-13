@@ -1,5 +1,9 @@
-#pragma once
-#include <JuceHeader.h>
+#include "Processors/Distortion.h"
+#include "Processors/DeepMindChorus.h"
+#include "Processors/DeepMindPhaser.h"
+#include "Processors/DeepMindEQ.h"
+#include "Processors/DeepMindDelay.h"
+#include "Processors/DeepMindReverb.h"
 
 namespace DeepMindDSP
 {
@@ -14,31 +18,29 @@ namespace DeepMindDSP
         void process(juce::dsp::AudioBlock<float>& block);
         
         // Effect parameters
+        void setDistortionParams(float drive, float tone, float mix, int type);
+        void setPhaserParams(float rate, float depth, float feedback, float mix);
         void setChorusParams(float rate, float depth, float mix);
         void setDelayParams(float time, float feedback, float mix);
         void setReverbParams(float size, float damp, float mix);
+        void setEQParams(float lg, float lf, float lmg, float lmf, float lmq, float hmg, float hmf, float hmq, float hg, float hf);
+        
+        void setRoutingMode(int mode); // 0=Series, 1=Parallel
 
     private:
-        enum { chorusIndex, delayIndex, reverbIndex };
+        Distortion distortion;
+        DeepMindPhaser phaser;
+        DeepMindChorus chorus;
+        DeepMindDelay delay;
+        DeepMindReverb reverb;
+        DeepMindEQ eq;
         
-        // Delay implementation as part of the implementation or custom
-        // Using juce::dsp::DelayLine for simplicity, but it needs a wrapper to be in ProcessorChain easily if we want purely that.
-        // Or we can just run them sequentially in process().
+        int currentRouting = 0; // 0=Series
         
-        juce::dsp::Chorus<float> chorus;
-        juce::dsp::DelayLine<float> delay { 48000 }; // Max delay size roughly 1 sec
-        juce::dsp::Reverb reverb;
+        // Parallel Processing Buffers
+        juce::AudioBuffer<float> parBuffer;
+        juce::AudioBuffer<float> accBuffer;
         
-        // Mix levels
-        float mixChorus = 0.0f;
-        float mixDelay = 0.0f;
-        float mixReverb = 0.0f;
-        
-        // Delay Params
-        float delayTime = 0.5f;
-        float delayFeedback = 0.0f;
         double sampleRate = 44100.0;
-        
-        juce::LinearSmoothedValue<float> smoothMixChorus { 0.0f };
     };
 }

@@ -92,6 +92,7 @@ void DeepMindOsc::processBlock(juce::dsp::AudioBlock<float>& block)
 
 void DeepMindOsc::setFrequency(float frequency)
 {
+    currentFrequency = frequency;
     oscSaw.setFrequency(frequency);
     oscPulse.setFrequency(frequency); // Not used directly if we derive from Saw, but good practice
 }

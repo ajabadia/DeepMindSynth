@@ -42,6 +42,9 @@ void ModMatrix::process(const ModSources& src, ModDestinations& dst)
             case 4: sourceValue = src.velocity; break;
             case 5: sourceValue = src.modWheel; break;
             case 6: sourceValue = src.keyTrack; break;
+            case 7: sourceValue = src.envVcf; break; // Added
+            case 8: sourceValue = src.envVca; break; // Added
+            case 9: sourceValue = src.ctrlSeq; break;
         }
 
         float amount = sourceValue * slot.amount;

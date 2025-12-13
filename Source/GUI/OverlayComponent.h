@@ -17,33 +17,46 @@ public:
     
     void setContent(std::unique_ptr<juce::Component> newContent)
     {
-        content = std::move(newContent);
-        addAndMakeVisible(content.get());
+        ownedContent = std::move(newContent);
+        activeContent = ownedContent.get();
+        addAndMakeVisible(activeContent);
         resized();
+        setVisible(true);
+    }
+    
+    // Show existing component (Non-owning)
+    void showComponent(juce::Component* componentToShow)
+    {
+        activeContent = componentToShow;
+        addAndMakeVisible(activeContent);
+        resized();
+        setVisible(true);
     }
     
     void resized() override
     {
-        if (content)
+        if (activeContent)
         {
             // Center the content, with max size
             int w = juce::jmin(800, getWidth() - 40);
             int h = juce::jmin(600, getHeight() - 40);
-            content->setBounds(getLocalBounds().getCentre().getX() - w/2, getLocalBounds().getCentre().getY() - h/2, w, h);
+            activeContent->setBounds(getLocalBounds().getCentre().getX() - w/2, getLocalBounds().getCentre().getY() - h/2, w, h);
         }
     }
     
     void mouseDown(const juce::MouseEvent& e) override
     {
-        // Close on click (simple dismissal for Phase 4)
+        // Close on click (simple dismissal)
         setVisible(false);
     }
     
     void clearContent()
     {
-        content = nullptr;
+        ownedContent = nullptr;
+        activeContent = nullptr;
     }
 
 private:
-    std::unique_ptr<juce::Component> content;
+    std::unique_ptr<juce::Component> ownedContent;
+    juce::Component* activeContent = nullptr;
 };

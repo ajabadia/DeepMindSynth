@@ -4,6 +4,36 @@ using namespace DeepMindDSP;
 
 Arpeggiator::Arpeggiator()
 {
+    // Define Default Patterns
+    // Pattern 0: Up 4 (Basic)
+    std::vector<PatternStep> p0;
+    p0.push_back({0, 0, 127, 0.5f});
+    p0.push_back({1, 0, 127, 0.5f});
+    p0.push_back({2, 0, 127, 0.5f});
+    p0.push_back({3, 0, 127, 0.5f});
+    patterns.push_back(p0);
+
+    // Pattern 1: UpDown 8
+    std::vector<PatternStep> p1;
+    p1 = {{0,0}, {1,0}, {2,0}, {3,0}, {3,0}, {2,0}, {1,0}, {0,0}};
+    patterns.push_back(p1);
+
+    // Pattern 2: Octave Jump
+    std::vector<PatternStep> p2;
+    p2 = {{0,0}, {0,1}, {1,0}, {1,1}, {2,0}, {2,1}, {3,0}, {3,1}};
+    patterns.push_back(p2);
+    
+    // Pattern 3: Random-ish
+    std::vector<PatternStep> p3;
+    p3 = {{0,0}, {2,0}, {1,0}, {3,0}, {0,1}, {2,1}, {1,1}, {3,1}};
+    patterns.push_back(p3);
+    
+    // Pattern 4: Rest Rhythms
+    std::vector<PatternStep> p4;
+    p4 = {{0,0}, {0,0,0}, {1,0}, {1,0,0}, {2,0}, {2,0,0}, {3,0}, {3,0,0}}; // Vel 0 = Rest logic needed
+    patterns.push_back(p4);
+    
+    // More can be added...
 }
 
 Arpeggiator::~Arpeggiator()
@@ -51,6 +81,12 @@ void Arpeggiator::setBypass(bool bypass)
 void Arpeggiator::setOctaveRange(int range)
 {
     octaveRange = range;
+}
+
+void Arpeggiator::setPattern(int patternIndex)
+{
+    if (patternIndex >= 0 && patternIndex < patterns.size())
+        currentPatternIndex = patternIndex;
 }
 
 void Arpeggiator::processBlock(juce::MidiBuffer& midiMessages, int numSamples)
@@ -133,10 +169,36 @@ int Arpeggiator::getNextNote()
 {
     if (heldNotes.size() == 0) return -1;
     
-    // Simple UP mode logic
-    int index = currentStep % heldNotes.size();
-    int note = heldNotes[index];
+    int numHeld = heldNotes.size();
+    int note = -1;
     
-    currentStep++;
+    if (currentMode == ArpMode::Pattern)
+    {
+        const auto& pat = patterns[currentPatternIndex];
+        auto step = pat[currentStep % pat.size()];
+        
+        // Map pattern note index to held notes
+        // Wrap index if held notes < requested index
+        int idx = step.noteIndex % numHeld;
+        
+        int baseNote = heldNotes[idx];
+        note = baseNote + (step.octave * 12);
+        
+        // Velocity/Rest check
+        if (step.velocity == 0) note = -1;
+        
+        currentStep++;
+        // Do NOT reset currentStep based on heldNotes size for Pattern mode, 
+        // rely on modulo of pattern size.
+    }
+    else
+    {
+        // ... existing simple logic or expanded logic for Up/Down/Random etc ..
+        // Simple UP mode logic fallback
+        int index = currentStep % numHeld;
+        note = heldNotes[index];
+        currentStep++;
+    }
+    
     return note;
 }
